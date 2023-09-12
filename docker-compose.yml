@@ -1,0 +1,41 @@
+version: "3"
+networks:
+  multidbapp
+services:
+  mongocontainer:
+    image: 'mongo:latest'
+    container_name: "mongocontainer"
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    networks:
+      - multidbapp
+
+  influxdb:
+    image: 'influxdb:1.8.10'
+    ports:
+      - "8086:8086"
+    environment:
+      - INFLUXDB_DB=car
+      - INFLUXDB_ADMIN_USER=root
+      - INFLUXDB_ADMIN_PASSWORD=root
+    networks:
+      - multidbapp
+
+  javacontainer:
+    image: sbmongosql
+    container_name: "javacontainer"
+    ports:
+      - "8089:8089"
+    environment:
+      - SPRING_DATA_MONGODB_DATABASE=cardb
+    stdin_open: true
+    tty: true
+    networks:
+      - multidbapp
+    build:
+      context: "./"
+      dockerfile: "Dockerfile"
+    depends_on:
+      - mongocontainer
+      - influxdb

@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: javacontainer-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: javacontainer
+  template:
+    metadata:
+      labels:
+        app: javacontainer
+    spec:
+      containers:
+        - name: javacontainer
+          image: localhost:5000/car
+          ports:
+            - containerPort: 8089
+          env:
+            - name: SPRING_DATA_MONGODB_DATABASE
+              value: cardb
+          stdin: true
+          tty: true
+          imagePullPolicy: Never

@@ -1,0 +1,11 @@
+{
+  "groups": [
+    {
+      "name": "aws",
+      "type": "com.mongo.example.mongodemo.SpringBootSmartVehicleApplication",
+      "sourceType": "com.mongo.example.mongodemo.SpringBootSmartVehicleApplication"
+    }
+  ],
+  "properties": [],
+  "hints": []
+}

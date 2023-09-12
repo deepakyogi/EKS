@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+spec:
+  selector:
+    app: mongo
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: influxdb-service
+spec:
+  selector:
+    app: influxdb
+  ports:
+    - protocol: TCP
+      port: 8086
+      targetPort: 8086
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: javacontainer-service
+spec:
+  selector:
+    app: javacontainer
+  ports:
+    - protocol: TCP
+      port: 8089
+      targetPort: 8089

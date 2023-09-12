@@ -1,0 +1,91 @@
+stages:
+  - sonar
+  - trivy
+  - build
+  # - deploy
+
+sonarqube-check:
+  stage: sonar
+  image: maven:3.6.3-jdk-11
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" # Defines the location of the analysis task cache
+    GIT_DEPTH: "0" # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+    - mvn verify sonar:sonar 
+  allow_failure: true
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == 'dev'
+
+
+trivy:
+  stage: trivy
+  image: docker:stable
+  services:
+    - name: docker:dind
+      entrypoint: ["env", "-u", "DOCKER_HOST"]
+      command: ["dockerd-entrypoint.sh"]
+  variables:
+    DOCKER_HOST: http://localhost:5000/
+    DOCKER_DRIVER: overlay2
+    # See https://github.com/docker-library/docker/pull/166
+    DOCKER_TLS_CERTDIR: ""
+    IMAGE: localhost:5000/car:latest
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: ".trivycache/"
+  before_script:
+    - export TRIVY_VERSION=$(wget -qO - "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+    - echo $TRIVY_VERSION
+    - wget --no-verbose https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz -O - | tar -zxvf -
+  allow_failure: true
+  script:
+    # Build image
+    - sudo docker build -t $IMAGE .
+    # Build report
+    - sudo ./trivy image --exit-code 0 --format template --template "@contrib/gitlab.tpl" -o gl-container-scanning-report.json $IMAGE
+    # - sudo ./trivy image --exit-code 0 --format json -o gl-container-scanning-report.json $IMAGE
+    # Print report
+    # - sudo ./trivy image --exit-code 0 --severity HIGH $IMAGE --format json
+    - sudo ./trivy image --exit-code 0 --severity HIGH $IMAGE
+    # Fail on severe vulnerabilities
+    #- sudo ./trivy image --exit-code 1 --severity CRITICAL $IMAGE
+  cache:
+    paths:
+      - .trivycache/
+  # Enables https://docs.gitlab.com/ee/user/application_security/container_scanning/ (Container Scanning report is available on GitLab EE Ultimate or GitLab.com Gold)
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+docker_build:
+  stage: build
+  script:
+    - mvn verify sonar:sonar 
+    - sudo docker login -u fevdocker -p fevdocker localhost:5000
+    - sudo docker build -t localhost:5000/car:latest .
+    - sudo docker push localhost:5000/car:latest
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == 'stage'
+
+# deploy:
+#   stage: deploy
+#   image: docker:stable
+#   services:
+#     - docker:dind
+#   variables:
+#     DOCKER_HOST: tcp://docker:2375
+#     KUBECONFIG: $CI_PROJECT_DIR/kubeconfig.yaml
+#   before_script:
+#     - apk update && apk add curl
+#     #- docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     - curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+#     - chmod +x kubectl
+#     - sudo mv kubectl /usr/local/bin/
+#     - kubectl version --client
+#   script:
+#     - kubectl apply -f mongo-deployment.yaml
+#     - kubectl apply -f influxdb-deployment.yaml
+#     - kubectl apply -f javacontainer-deployment.yaml
+#     - kubectl apply -f services.yaml
